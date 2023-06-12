@@ -41,7 +41,7 @@ GameData loadGameData();
 void deleteGameDataFile();
 
 int main() {
-    srand(time(0)); // Initialize random seed
+    srand(static_cast<unsigned int>(time(0))); // Initialize random seed
 
     displayIntro();
 
@@ -92,7 +92,7 @@ int main() {
             viewBettingHistory(gameData);
             break;
         case 6:
-            viewAchievements(gameData.achievements);
+            viewAchievements(gameData); // Changed to correct function name
             break;
         case 7:
             updateHighScoreAndQuit(gameData);
@@ -126,47 +126,57 @@ void displayMenu() {
 
 void displayRules() {
     cout << "----- SLOT MACHINE RULES -----" << endl;
-    cout << "Match three symbols to win." << endl;
-    cout << "The jackpot starts at 100 and increases by 10 with each play." << endl;
-    cout << "If you match three dollar signs ($$$), you win the jackpot." << endl;
-    cout << "Good luck!" << endl;
+    cout << "1. The objective of the game is to match 3 symbols in a row." << endl;
+    cout << "2. Each symbol has a specific payout associated with it." << endl;
+    cout << "3. You can place bets using your available balance." << endl;
+    cout << "4. If you run out of funds, you can add more." << endl;
+    cout << "5. The jackpot increases with each spin and can be won randomly." << endl;
+    cout << "6. Good luck and have fun!" << endl;
+    cout << "------------------------------" << endl;
 }
 
 void playSlotMachine(GameData& gameData) {
-    cout << "----- SLOT MACHINE -----" << endl;
-
     int betAmount = getBetAmount(gameData);
 
-    if (gameData.balance < betAmount) {
-        cout << "Insufficient balance. Please add funds." << endl;
-        return;
-    }
+    if (betAmount <= gameData.balance) {
+        gameData.balance -= betAmount;
+        gameData.betHistory.push_back(betAmount);
 
-    gameData.balance -= betAmount;
+        int delay = getDifficulty();
 
-    displaySymbols(500);
+        displaySymbols(delay);
 
-    if (isLuckySpin()) {
-        cout << "Congratulations! You won " << betAmount * 3 << "." << endl;
-        gameData.balance += betAmount * 3;
+        int random1 = getRandomNumber(1, 9);
+        int random2 = getRandomNumber(1, 9);
+        int random3 = getRandomNumber(1, 9);
+
+        cout << random1 << " - " << random2 << " - " << random3 << endl;
+
+        if (random1 == random2 && random2 == random3) {
+            cout << "Congratulations! You won!" << endl;
+            int payout = betAmount * random1;
+            gameData.balance += payout;
+            cout << "Payout: " << payout << endl;
+
+            if (isLuckySpin()) {
+                displayJackpot(gameData.jackpot);
+                gameData.balance += gameData.jackpot;
+                gameData.jackpot = 100;
+            }
+        }
+        else {
+            cout << "Better luck next time!" << endl;
+        }
 
         if (gameData.balance > gameData.highScore) {
             gameData.highScore = gameData.balance;
         }
 
-        if (gameData.balance >= gameData.jackpot) {
-            cout << "Congratulations! You won the jackpot of " << gameData.jackpot << "!" << endl;
-            unlockAchievement(gameData.achievements, "Jackpot Winner");
-            gameData.jackpot += 10;
-        }
+        saveGameData(gameData);
     }
     else {
-        cout << "Better luck next time!" << endl;
+        cout << "Insufficient funds. Please add more funds." << endl;
     }
-
-    gameData.betHistory.push_back(betAmount);
-
-    saveGameData(gameData);
 }
 
 void addFunds(GameData& gameData) {
@@ -174,22 +184,26 @@ void addFunds(GameData& gameData) {
     cout << "Enter the amount to add: ";
     cin >> amount;
 
-    gameData.balance += amount;
-
-    cout << "Funds added successfully." << endl;
-
-    saveGameData(gameData);
+    if (amount > 0) {
+        gameData.balance += amount;
+        cout << "Funds added successfully!" << endl;
+        cout << "New Balance: " << gameData.balance << endl;
+        saveGameData(gameData);
+    }
+    else {
+        cout << "Invalid amount. Please try again." << endl;
+    }
 }
 
 void viewAchievements(const GameData& gameData) {
     cout << "----- ACHIEVEMENTS -----" << endl;
 
     if (gameData.achievements.empty()) {
-        cout << "No achievements unlocked." << endl;
+        cout << "No achievements unlocked yet." << endl;
     }
     else {
         for (const string& achievement : gameData.achievements) {
-            cout << "- " << achievement << endl;
+            cout << achievement << endl;
         }
     }
 
@@ -200,24 +214,26 @@ void viewBettingHistory(const GameData& gameData) {
     cout << "----- BETTING HISTORY -----" << endl;
 
     if (gameData.betHistory.empty()) {
-        cout << "No betting history." << endl;
+        cout << "No betting history available." << endl;
     }
     else {
-        for (int betAmount : gameData.betHistory) {
-            cout << "- " << betAmount << endl;
+        for (int bet : gameData.betHistory) {
+            cout << "Bet Amount: " << bet << endl;
         }
     }
 
-    cout << "---------------------------" << endl;
+    cout << "----------------------------" << endl;
 }
 
 void updateHighScoreAndQuit(GameData& gameData) {
     if (gameData.balance > gameData.highScore) {
         gameData.highScore = gameData.balance;
-        cout << "New high score: " << gameData.highScore << endl;
+        saveGameData(gameData);
+        cout << "New high score recorded!" << endl;
     }
-
-    saveGameData(gameData);
+    else {
+        cout << "High score not beaten. Goodbye!" << endl;
+    }
 }
 
 int getStartingBalance() {
@@ -229,11 +245,10 @@ int getStartingBalance() {
 
 void displayIntro() {
     cout << "Welcome to the Slot Machine Game!" << endl;
-    cout << "------------------------------" << endl;
 }
 
 void displayDifficultyOptions() {
-    cout << "Select a difficulty level:" << endl;
+    cout << "Select the difficulty level:" << endl;
     cout << "1. Easy" << endl;
     cout << "2. Medium" << endl;
     cout << "3. Hard" << endl;
@@ -241,136 +256,99 @@ void displayDifficultyOptions() {
 }
 
 int getDifficulty() {
-    int difficulty;
+    int choice;
     displayDifficultyOptions();
-    cin >> difficulty;
+    cin >> choice;
 
-    while (difficulty < 1 || difficulty > 3) {
+    while (choice < 1 || choice > 3) {
         cout << "Invalid choice. Please try again." << endl;
         displayDifficultyOptions();
-        cin >> difficulty;
+        cin >> choice;
     }
 
-    return difficulty;
+    int delay;
+    switch (choice) {
+    case 1:
+        delay = 3000;
+        break;
+    case 2:
+        delay = 2000;
+        break;
+    case 3:
+        delay = 1000;
+        break;
+    default:
+        delay = 3000;
+        break;
+    }
+
+    return delay;
 }
 
 int getBetAmount(const GameData& gameData) {
-    int betAmount;
-
-    cout << "Current balance: " << gameData.balance << endl;
-
-    if (gameData.balance < gameData.jackpot) {
-        cout << "Minimum bet amount is " << gameData.balance << "." << endl;
-        cout << "Enter your bet amount: ";
-        cin >> betAmount;
-
-        while (betAmount < 1 || betAmount > gameData.balance) {
-            cout << "Invalid bet amount. Please try again." << endl;
-            cout << "Enter your bet amount: ";
-            cin >> betAmount;
-        }
-    }
-    else {
-        cout << "Enter your bet amount (1-" << gameData.balance << "): ";
-        cin >> betAmount;
-
-        while (betAmount < 1 || betAmount > gameData.balance) {
-            cout << "Invalid bet amount. Please try again." << endl;
-            cout << "Enter your bet amount (1-" << gameData.balance << "): ";
-            cin >> betAmount;
-        }
-    }
-
-    return betAmount;
+    int amount;
+    cout << "Current Balance: " << gameData.balance << endl;
+    cout << "Enter the bet amount: ";
+    cin >> amount;
+    return amount;
 }
 
 int getRandomNumber(int min, int max) {
-    return rand() % (max - min + 1) + min;
+    return min + rand() % (max - min + 1);
 }
 
 void displaySymbols(int delay) {
-    vector<string> symbols = { "cherry", "lemon", "orange", "plum", "bell", "bar", "seven", "$$$" };
-
     cout << "Spinning..." << endl;
     this_thread::sleep_for(chrono::milliseconds(delay));
 
-    vector<int> selectedSymbols;
+    cout << "*-*-*" << endl;
+    this_thread::sleep_for(chrono::milliseconds(delay));
 
-    for (int i = 0; i < 3; i++) {
-        int symbolIndex = getRandomNumber(0, symbols.size() - 1);
-        selectedSymbols.push_back(symbolIndex);
-        cout << symbols[symbolIndex] << " ";
-        this_thread::sleep_for(chrono::milliseconds(delay));
-    }
+    cout << "-*-*-" << endl;
+    this_thread::sleep_for(chrono::milliseconds(delay));
 
-    cout << endl;
+    cout << "*-*-*" << endl;
+    this_thread::sleep_for(chrono::milliseconds(delay));
 }
 
 bool playAgain() {
     char choice;
-    cout << "Would you like to play again? (Y/N): ";
+    cout << "Play again? (Y/N): ";
     cin >> choice;
     return (choice == 'Y' || choice == 'y');
 }
 
 bool isLuckySpin() {
-    int difficulty = getDifficulty();
-
-    switch (difficulty) {
-    case 1:
-        return getRandomNumber(1, 100) <= 50;
-    case 2:
-        return getRandomNumber(1, 100) <= 30;
-    case 3:
-        return getRandomNumber(1, 100) <= 10;
-    default:
-        return false;
-    }
+    int random = getRandomNumber(1, 10);
+    return (random == 1);
 }
 
 void displayJackpot(int jackpot) {
-    cout << "Current Jackpot: " << jackpot << endl;
+    cout << "Congratulations! You hit the jackpot!" << endl;
+    cout << "Jackpot Amount: " << jackpot << endl;
 }
 
 void unlockAchievement(vector<string>& achievements, const string& achievement) {
     if (find(achievements.begin(), achievements.end(), achievement) == achievements.end()) {
         achievements.push_back(achievement);
-        cout << "Achievement unlocked: " << achievement << endl;
+        cout << "Achievement Unlocked: " << achievement << endl;
     }
 }
 
 void saveGameData(const GameData& gameData) {
     ofstream file("game_data.bin", ios::binary);
-
-    if (file) {
-        file.write(reinterpret_cast<const char*>(&gameData), sizeof(gameData));
-        file.close();
-    }
-    else {
-        cout << "Error: Failed to save game data." << endl;
-    }
+    file.write(reinterpret_cast<const char*>(&gameData), sizeof(gameData));
+    file.close();
 }
 
 GameData loadGameData() {
-    ifstream file("game_data.bin", ios::binary);
-
     GameData gameData;
-
-    if (file) {
-        file.read(reinterpret_cast<char*>(&gameData), sizeof(gameData));
-        file.close();
-    }
-    else {
-        cout << "Error: Failed to load game data. Starting a new game." << endl;
-        gameData.balance = getStartingBalance();
-        gameData.jackpot = 100;
-        gameData.highScore = 0;
-    }
-
+    ifstream file("game_data.bin", ios::binary);
+    file.read(reinterpret_cast<char*>(&gameData), sizeof(gameData));
+    file.close();
     return gameData;
 }
 
 void deleteGameDataFile() {
     remove("game_data.bin");
 }
-
