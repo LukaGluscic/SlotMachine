@@ -1,4 +1,5 @@
-#include <iostream>
+#include<iostream>
+#include<string>
 #include <fstream>
 #include <cstdlib>
 #include <ctime>
@@ -36,9 +37,11 @@ bool playAgain();
 bool isLuckySpin();
 void displayJackpot(int jackpot);
 void unlockAchievement(vector<string>& achievements, const string& achievement);
-void saveGameData(const GameData& gameData);
-GameData loadGameData();
-void deleteGameDataFile();
+void saveGameDataBinary(const GameData& gameData);
+void loadGameDataBinary(GameData& gameData);
+void saveGameDataText(const GameData& gameData);
+void loadGameDataText(GameData& gameData);
+void deleteGameDataFiles();
 
 int main() {
     srand(static_cast<unsigned int>(time(0))); // Initialize random seed
@@ -46,10 +49,10 @@ int main() {
     displayIntro();
 
     char viewRulesChoice;
-    cout << "Would you like to view the rules? (Y/N): ";
+    cout << "Da li zelite vidjeti pravila prije igranja: (D/N): ";
     cin >> viewRulesChoice;
 
-    if (viewRulesChoice == 'Y' || viewRulesChoice == 'y') {
+    if (viewRulesChoice == 'D' || viewRulesChoice == 'N') {
         displayRules();
     }
 
@@ -57,8 +60,8 @@ int main() {
     bool isNewGame = true;
 
     // Load game data if it exists
-    if (ifstream("game_data.bin")) {
-        gameData = loadGameData();
+    if (ifstream("game_data_binary.bin") && ifstream("game_data_text.txt")) {
+        loadGameDataBinary(gameData);
         isNewGame = false;
     }
     else {
@@ -99,39 +102,39 @@ int main() {
             continuePlaying = false;
             break;
         default:
-            cout << "Invalid choice. Please try again." << endl;
+            cout << "Pogresan unos. Pokusajte ponovo!" << endl;
             break;
         }
     }
 
-    cout << "Thank you for playing!" << endl;
+    cout << "Hvala na igranju!" << endl;
 
     return 0;
 }
 
 void displayMenu() {
     cout << "===================" << endl;
-    cout << "       MENU        " << endl;
+    cout << "       MENI        " << endl;
     cout << "===================" << endl;
-    cout << "1. View Rules" << endl;
-    cout << "2. Play Slot Machine" << endl;
-    cout << "3. Add Funds" << endl;
-    cout << "4. View Achievements" << endl;
-    cout << "5. View Betting History" << endl;
-    cout << "6. View All Achievements" << endl;
-    cout << "7. Update High Score and Quit" << endl;
+    cout << "1. Pravila" << endl;
+    cout << "2. Igraj Slot Machine" << endl;
+    cout << "3. Dodavanje novca na racun" << endl;
+    cout << "4. Vasa postignuca" << endl;
+    cout << "5. Povijest kladnja" << endl;
+    cout << "6. Sva vasa postignuca" << endl;
+    cout << "7. Azurirajte najbolji rezultat te izadite iz igre" << endl;
     cout << "===================" << endl;
-    cout << "Enter your choice (1-7): ";
+    cout << "Vas odabir je (1-7): ";
 }
 
 void displayRules() {
-    cout << "----- SLOT MACHINE RULES -----" << endl;
-    cout << "1. The objective of the game is to match 3 symbols in a row." << endl;
-    cout << "2. Each symbol has a specific payout associated with it." << endl;
-    cout << "3. You can place bets using your available balance." << endl;
-    cout << "4. If you run out of funds, you can add more." << endl;
-    cout << "5. The jackpot increases with each spin and can be won randomly." << endl;
-    cout << "6. Good luck and have fun!" << endl;
+    cout << "----- SLOT MACHINE PRAVILA -----" << endl;
+    cout << "1. Cilj igre je spojiti 3 simbola u nizu." << endl;
+    cout << "2. Svaki simbol ima odredenu isplatu povezanu s njim" << endl;
+    cout << "3. Mozete se kladiti koristeci svoj raspoloživi saldo." << endl;
+    cout << "4. Ako vam ponestane novaca, možete dodati jos." << endl;
+    cout << "5. Jackpot se povecava sa svakim okretanjem i može se osvojiti nasumicno." << endl;
+    cout << "6. Sretno i zabavite se!" << endl;
     cout << "------------------------------" << endl;
 }
 
@@ -153,7 +156,7 @@ void playSlotMachine(GameData& gameData) {
         cout << random1 << " - " << random2 << " - " << random3 << endl;
 
         if (random1 == random2 && random2 == random3) {
-            cout << "Congratulations! You won!" << endl;
+            cout << "CESTITAMO! Pobjedili ste!" << endl;
             int payout = betAmount * random1;
             gameData.balance += payout;
             cout << "Payout: " << payout << endl;
@@ -165,33 +168,35 @@ void playSlotMachine(GameData& gameData) {
             }
         }
         else {
-            cout << "Better luck next time!" << endl;
+            cout << "Vise srece drugi put!" << endl;
         }
 
         if (gameData.balance > gameData.highScore) {
             gameData.highScore = gameData.balance;
         }
 
-        saveGameData(gameData);
+        saveGameDataBinary(gameData);
+        saveGameDataText(gameData);
     }
     else {
-        cout << "Insufficient funds. Please add more funds." << endl;
+        cout << "Nedovoljno novaca. Dodajte još novca." << endl;
     }
 }
 
 void addFunds(GameData& gameData) {
     int amount;
-    cout << "Enter the amount to add: ";
+    cout << "Dodajte svotu novaca: ";
     cin >> amount;
 
     if (amount > 0) {
         gameData.balance += amount;
-        cout << "Funds added successfully!" << endl;
-        cout << "New Balance: " << gameData.balance << endl;
-        saveGameData(gameData);
+        cout << "Novac je uspjesno dodan na vas racun!" << endl;
+        cout << "Stanje vaseg racuna: " << gameData.balance << endl;
+        saveGameDataBinary(gameData);
+        saveGameDataText(gameData);
     }
     else {
-        cout << "Invalid amount. Please try again." << endl;
+        cout << "Nevazeci iznos. Molimo pokusajte ponovno." << endl;
     }
 }
 
@@ -199,7 +204,7 @@ void viewAchievements(const GameData& gameData) {
     cout << "----- ACHIEVEMENTS -----" << endl;
 
     if (gameData.achievements.empty()) {
-        cout << "No achievements unlocked yet." << endl;
+        cout << "Jos nema otkljucanih postignuca." << endl;
     }
     else {
         for (const string& achievement : gameData.achievements) {
@@ -211,144 +216,186 @@ void viewAchievements(const GameData& gameData) {
 }
 
 void viewBettingHistory(const GameData& gameData) {
-    cout << "----- BETTING HISTORY -----" << endl;
+    cout << "----- POVIJET KLADENJA -----" << endl;
 
     if (gameData.betHistory.empty()) {
-        cout << "No betting history available." << endl;
+        cout << "Nema dostupne povijesti kladenja." << endl;
     }
     else {
         for (int bet : gameData.betHistory) {
-            cout << "Bet Amount: " << bet << endl;
+            cout << bet << endl;
         }
     }
 
-    cout << "----------------------------" << endl;
+    cout << "---------------------------" << endl;
 }
 
 void updateHighScoreAndQuit(GameData& gameData) {
-    if (gameData.balance > gameData.highScore) {
-        gameData.highScore = gameData.balance;
-        saveGameData(gameData);
-        cout << "New high score recorded!" << endl;
+    cout << "----- NAJBOLJI REZULTAT -----" << endl;
+    cout << "Vas trenutni najbolji rezultat: " << gameData.highScore << endl;
+
+    int newHighScore;
+    cout << "Upisite vas novi najbolji rezulat: ";
+    cin >> newHighScore;
+
+    if (newHighScore > gameData.highScore) {
+        gameData.highScore = newHighScore;
+        cout << "Najbolji rezultat je uspjesno azuriran!" << endl;
+        saveGameDataBinary(gameData);
+        saveGameDataText(gameData);
     }
     else {
-        cout << "High score not beaten. Goodbye!" << endl;
+        cout << "Novi najbolji rezultat nije veci od Vaseg proslog najboljeg rezultata." << endl;
     }
+
+    cout << "----------------------" << endl;
 }
 
 int getStartingBalance() {
-    int balance;
-    cout << "Enter your starting balance: ";
-    cin >> balance;
-    return balance;
+    int startingBalance;
+    cout << "Unesite Vas pocetni saldo: ";
+    cin >> startingBalance;
+    return startingBalance;
 }
 
 void displayIntro() {
-    cout << "Welcome to the Slot Machine Game!" << endl;
+    cout << "===================" << endl;
+    cout << "   SLOT MACHINE" << endl;
+    cout << "===================" << endl;
 }
 
 void displayDifficultyOptions() {
-    cout << "Select the difficulty level:" << endl;
-    cout << "1. Easy" << endl;
-    cout << "2. Medium" << endl;
-    cout << "3. Hard" << endl;
-    cout << "Enter your choice (1-3): ";
+    cout << "----- RAZINA(TEZINA) IGRE -----" << endl;
+    cout << "1. Lako (kasnjenje od 1 sekunde)" << endl;
+    cout << "2. Srednje (kasnjenje od 2 sekunde)" << endl;
+    cout << "3. Tesko (kasnjenje od 3 sekunde)" << endl;
+    cout << "-----------------------------" << endl;
 }
 
 int getDifficulty() {
-    int choice;
     displayDifficultyOptions();
+
+    int choice;
+    cout << "Unesite zeljenu tezinu(razinu) (1-3): ";
     cin >> choice;
 
-    while (choice < 1 || choice > 3) {
-        cout << "Invalid choice. Please try again." << endl;
-        displayDifficultyOptions();
-        cin >> choice;
-    }
-
-    int delay;
     switch (choice) {
     case 1:
-        delay = 3000;
-        break;
+        return 1000; // 1 second delay
     case 2:
-        delay = 2000;
-        break;
+        return 2000; // 2 second delay
     case 3:
-        delay = 1000;
-        break;
+        return 3000; // 3 second delay
     default:
-        delay = 3000;
-        break;
+        return 1000; // Default to easy
     }
-
-    return delay;
 }
 
 int getBetAmount(const GameData& gameData) {
-    int amount;
-    cout << "Current Balance: " << gameData.balance << endl;
-    cout << "Enter the bet amount: ";
-    cin >> amount;
-    return amount;
+    int betAmount;
+    cout << "Unesite ulog: ";
+    cin >> betAmount;
+
+    if (betAmount > 0 && betAmount <= gameData.balance) {
+        return betAmount;
+    }
+    else {
+        cout << "Krivi unos.Pokusajte ponovo." << endl;
+        return getBetAmount(gameData);
+    }
 }
 
 int getRandomNumber(int min, int max) {
-    return min + rand() % (max - min + 1);
+    return rand() % (max - min + 1) + min;
 }
 
 void displaySymbols(int delay) {
-    cout << "Spinning..." << endl;
-    this_thread::sleep_for(chrono::milliseconds(delay));
-
-    cout << "*-*-*" << endl;
-    this_thread::sleep_for(chrono::milliseconds(delay));
-
-    cout << "-*-*-" << endl;
-    this_thread::sleep_for(chrono::milliseconds(delay));
-
-    cout << "*-*-*" << endl;
+    cout << "Okretanje kotaca..." << endl;
     this_thread::sleep_for(chrono::milliseconds(delay));
 }
 
 bool playAgain() {
     char choice;
-    cout << "Play again? (Y/N): ";
+    cout << "Da li zelite igrati ponovo? (D/N): ";
     cin >> choice;
-    return (choice == 'Y' || choice == 'y');
+    return (choice == 'D' || choice == 'y');
 }
 
 bool isLuckySpin() {
-    int random = getRandomNumber(1, 10);
-    return (random == 1);
+    int probability = getRandomNumber(1, 100);
+    return (probability <= 5); // 5% chance
 }
 
 void displayJackpot(int jackpot) {
-    cout << "Congratulations! You hit the jackpot!" << endl;
-    cout << "Jackpot Amount: " << jackpot << endl;
+    cout << "Cestitamo! Osvojili ste jackpot!" << endl;
+    cout << "Jackpot: " << jackpot << endl;
 }
 
 void unlockAchievement(vector<string>& achievements, const string& achievement) {
-    if (find(achievements.begin(), achievements.end(), achievement) == achievements.end()) {
-        achievements.push_back(achievement);
-        cout << "Achievement Unlocked: " << achievement << endl;
-    }
+    cout << "Postugnuce otkljucano: " << achievement << endl;
+    achievements.push_back(achievement);
 }
 
-void saveGameData(const GameData& gameData) {
-    ofstream file("game_data.bin", ios::binary);
+void saveGameDataBinary(const GameData& gameData) {
+    ofstream file("game_data_binary.bin", ios::binary);
     file.write(reinterpret_cast<const char*>(&gameData), sizeof(gameData));
     file.close();
 }
 
-GameData loadGameData() {
-    GameData gameData;
-    ifstream file("game_data.bin", ios::binary);
+void loadGameDataBinary(GameData& gameData) {
+    ifstream file("game_data_binary.bin", ios::binary);
     file.read(reinterpret_cast<char*>(&gameData), sizeof(gameData));
     file.close();
-    return gameData;
 }
 
-void deleteGameDataFile() {
-    remove("game_data.bin");
+void saveGameDataText(const GameData& gameData) {
+    ofstream file("game_data_text.txt");
+
+    file << gameData.balance << endl;
+    file << gameData.jackpot << endl;
+
+    file << gameData.betHistory.size() << endl;
+    for (int bet : gameData.betHistory) {
+        file << bet << endl;
+    }
+
+    file << gameData.achievements.size() << endl;
+    for (const string& achievement : gameData.achievements) {
+        file << achievement << endl;
+    }
+
+    file << gameData.highScore << endl;
+
+    file.close();
+}
+
+void loadGameDataText(GameData& gameData) {
+    ifstream file("game_data_text.txt");
+
+    file >> gameData.balance;
+    file >> gameData.jackpot;
+
+    int betHistorySize;
+    file >> betHistorySize;
+    gameData.betHistory.resize(betHistorySize);
+    for (int i = 0; i < betHistorySize; ++i) {
+        file >> gameData.betHistory[i];
+    }
+
+    int achievementsSize;
+    file >> achievementsSize;
+    gameData.achievements.resize(achievementsSize);
+    for (int i = 0; i < achievementsSize; ++i) {
+        file.ignore();
+        getline(file, gameData.achievements[i]);
+    }
+
+    file >> gameData.highScore;
+
+    file.close();
+}
+
+void deleteGameDataFiles() {
+    remove("game_data_binary.bin");
+    remove("game_data_text.txt");
 }
